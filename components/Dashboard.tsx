@@ -64,6 +64,10 @@ export default function Dashboard() {
   const [loading,setLoading] = useState(false);
   const [analysis,setAnalysis] = useState<any>(null);
   const [aiError,setAiError] = useState("");
+  const [aiProviders,setAiProviders] = useState<{id:string;label:string;model:string;note:string}[]>([]);
+  const [aiProvider,setAiProvider] = useState("gemini");
+  const [aiPreset,setAiPreset] = useState("quick");
+  const [aiMeta,setAiMeta] = useState<{providerLabel?:string;model?:string;preset?:string}|null>(null);
   const [timeframe,setTimeframe] = useState("M15");
   const [riskBalance,setRiskBalance] = useState("1000");
   const [riskPercent,setRiskPercent] = useState("1");
@@ -74,6 +78,17 @@ export default function Dashboard() {
   const [entryFrame,setEntryFrame] = useState("M15");
   const [outcome,setOutcome] = useState<JournalEntry["outcome"]>("Open");
 
+  useEffect(()=>{
+    let active=true;
+    fetch("/api/analysis",{cache:"no-store"}).then(r=>r.json()).then(data=>{
+      if(!active) return;
+      const list=Array.isArray(data.providers)?data.providers:[];
+      setAiProviders(list);
+      const preferred=list.some((p:any)=>p.id===data.defaultProvider)?data.defaultProvider:(list[0]?.id||"");
+      setAiProvider(preferred);
+    }).catch(()=>{if(active)setAiProviders([]);});
+    return ()=>{active=false;};
+  },[]);
   useEffect(()=>{
     try {
       const saved=localStorage.getItem("aitt-journal-v1");
@@ -103,12 +118,14 @@ export default function Dashboard() {
   }
   async function runAnalysis() {
     if(!payload) { setAiError("Ambil data market terlebih dahulu."); return; }
-    setLoading(true); setAiError(""); setAnalysis("");
+    if(!aiProvider) { setAiError("Belum ada AI provider yang dikonfigurasi admin."); return; }
+    setLoading(true); setAiError(""); setAnalysis(""); setAiMeta(null);
     try {
-      const res=await fetch("/api/analysis",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({market:payload})});
+      const res=await fetch("/api/analysis",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({market:payload,provider:aiProvider,preset:aiPreset})});
       const data=await res.json();
       if(!res.ok) throw new Error(data.error||`AI API HTTP ${res.status}`);
       setAnalysis(data.analysis);
+      setAiMeta({providerLabel:data.providerLabel,model:data.model,preset:data.preset});
     } catch(e) { setAiError(e instanceof Error?e.message:"AI belum tersedia."); }
     finally { setLoading(false); }
   }
@@ -167,12 +184,22 @@ export default function Dashboard() {
         </div>
       </>}
 
-      {page==="AI Analysis" && <><Head title="AI Market Analysis" sub="REASONING MODULE · XAUUSD"/><Panel>
-        <div className="panel-head"><div><h2>Research Copilot</h2><span className="muted">Analisis hanya menggunakan candle yang berhasil diambil.</span></div><span className="tag">NO AUTO EXECUTION</span></div>
+      {page==="AI Analysis" && <><Head title="AI Market Analysis" sub="MULTI-PROVIDER RESEARCH MODULE · XAUUSD"/><Panel>
+        <div className="panel-head"><div><h2>Research Copilot</h2><span className="muted">Pilih AI dan preset. Semua provider memakai candle Twelve Data yang sama.</span></div><span className="tag">NO AUTO EXECUTION</span></div>
+        <div className="ai-controls">
+          <label>AI PROVIDER<select className="select" value={aiProvider} onChange={e=>setAiProvider(e.target.value)} disabled={!aiProviders.length}>
+            {aiProviders.length?aiProviders.map(p=><option key={p.id} value={p.id}>{p.label} · {p.model}</option>):<option value="">Belum dikonfigurasi</option>}
+          </select></label>
+          <label>ANALYSIS PRESET<select className="select" value={aiPreset} onChange={e=>setAiPreset(e.target.value)}>
+            <option value="quick">Quick Analysis</option><option value="deep">Deep Analysis</option><option value="technical">Technical Structure</option><option value="fundamental">Fundamental Context</option><option value="multi">Multi-Perspective</option>
+          </select></label>
+        </div>
+        {aiProviders.find(p=>p.id===aiProvider)?.note && <p className="provider-note">{aiProviders.find(p=>p.id===aiProvider)?.note}</p>}
         <div className="toolbar"><select className="select" value={timeframe} onChange={e=>changeFrame(e.target.value)}>{frames.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><button className="button" onClick={()=>refreshMarket()} disabled={loading}><RefreshCw size={14}/> Refresh market</button></div>
-        <div className="analysis-box tall"><span className="eyebrow">ANALYSIS OUTPUT</span>{analysis ? <AnalysisView data={analysis}/> : <p>{aiError||"Belum ada hasil analisis."}</p>}</div>
-        <button className="button primary full" onClick={runAnalysis} disabled={loading||!payload}><BrainCircuit size={15}/>{loading?"Processing...":"Run AI analysis"}</button>
-        <p className="disclaimer">Informasi edukatif, bukan kepastian arah harga atau instruksi transaksi. AI dapat keliru.</p>
+        <div className="analysis-box tall"><span className="eyebrow">ANALYSIS OUTPUT</span>{aiMeta&&<div className="analysis-meta">{aiMeta.providerLabel} · {aiMeta.model} · {aiMeta.preset?.toUpperCase()}</div>}{analysis ? <AnalysisView data={analysis}/> : <p>{aiError||"Pilih AI dan preset, ambil data market, lalu jalankan analisis."}</p>}</div>
+        <button className="button primary full" onClick={runAnalysis} disabled={loading||!payload||!aiProvider}><BrainCircuit size={15}/>{loading?"Processing...":"Run AI analysis"}</button>
+        {!aiProviders.length&&<p className="disclaimer">Admin perlu mengisi API key dan model provider melalui Environment Variables Vercel.</p>}
+        <p className="disclaimer">Free tier tetap memiliki kuota dan batas penggunaan. Informasi edukatif; AI dapat keliru dan bukan instruksi transaksi.</p>
       </Panel></>}
 
       {page==="Signals" && <><Head title="Signals" sub="RESEARCH IDEAS · NOT EXECUTABLE"/><Panel>
@@ -220,7 +247,9 @@ export default function Dashboard() {
         <div className="settings-row"><span>Connection status</span><b className={payload?"good":"warn"}>{status}</b></div>
         <div className="settings-row"><span>Current timeframe</span><b>{frames.find(x=>x[0]===timeframe)?.[1]||timeframe}</b></div>
         <div className="toolbar"><select className="select" value={timeframe} onChange={e=>changeFrame(e.target.value)}>{frames.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><button className="button" onClick={()=>refreshMarket()} disabled={loading}><RefreshCw size={14}/> Test connection</button></div>
-        <p className="disclaimer">AI provider harus OpenAI-compatible chat completions endpoint. Atur AI_BASE_URL, AI_API_KEY, dan AI_MODEL di Vercel, lalu redeploy.</p>
+        <div className="settings-row"><span>AI providers configured</span><b>{aiProviders.length} provider(s)</b></div>
+        {aiProviders.map(p=><div className="settings-row" key={p.id}><span>{p.label}</span><b>{p.model}</b></div>)}
+        <p className="disclaimer">API key tidak pernah dikirim ke browser. Admin mengatur provider melalui Environment Variables Vercel. Pengguna hanya dapat memilih provider yang sudah dikonfigurasi.</p>
       </Panel><Panel><div className="panel-head"><h2><LockKeyhole size={17}/> Privacy & limitations</h2></div><p className="muted">Journal disimpan di localStorage browser ini dan tidak tersinkron ke perangkat lain. Tidak ada koneksi broker atau eksekusi otomatis. Data market bergantung pada paket, kuota, dan keterlambatan provider.</p></Panel></>}
 
       <footer><span><span className="dot amber"/> {status}</span><span>{message}</span><span>OBSERVE · ANALYZE · VALIDATE</span></footer>
