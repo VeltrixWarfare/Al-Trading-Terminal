@@ -56,7 +56,7 @@ export default function Dashboard() {
       <header className="topbar"><div><span className="eyebrow">PRIVATE RESEARCH ENVIRONMENT</span><h1>Command Center</h1></div><div className="top-right"><span className="pill"><span className="dot amber"/>{status}</span><span className="pill"><LockKeyhole size={14}/> PERSONAL</span></div></header>
       <section className="metrics">
         <div className="metric"><span>INSTRUMENT</span><strong>XAUUSD</strong><small>Gold / US Dollar</small></div>
-        <div className="metric"><span>LAST PRICE</span><strong>{payload ? ((payload.quote.bid+payload.quote.ask)/2).toFixed(2) : "—"}</strong><small>{payload ? `Source: ${payload.quote.source}` : "Awaiting market feed"}</small></div>
+        <div className="metric"><span>LAST PRICE</span><strong>{payload ? payload.quote.last.toFixed(2) : "—"}</strong><small>{payload ? `Source: ${payload.quote.source}` : "Awaiting market feed"}</small></div>
         <div className="metric"><span>DATA STATUS</span><strong className={payload?"good":"warn"}>{status}</strong><small>{payload ? new Date(payload.quote.timestamp).toLocaleString("id-ID") : "No verified quote"}</small></div>
         <div className="metric"><span>AI ENGINE</span><strong className="warn">NOT CONFIGURED</strong><small>Provider setup required</small></div>
       </section>
