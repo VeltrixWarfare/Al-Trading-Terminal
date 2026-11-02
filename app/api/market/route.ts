@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 const intervals: Record<string, string> = {
   M1: "1min",
+  M3: "3min",
   M5: "5min",
   M15: "15min",
   M30: "30min",
@@ -56,7 +57,7 @@ export async function GET(request: Request) {
     const data = await response.json().catch(() => null);
     if (!response.ok) {
       const detail = typeof data?.message === "string" ? data.message : `HTTP ${response.status}`;
-      throw new Error(`Twelve Data: ${detail}`);
+      throw new Error(`Twelve Data (${response.status}): ${detail}`);
     }
     if (data?.status === "error" || data?.code || !Array.isArray(data?.values)) {
       const detail = typeof data?.message === "string" ? data.message : "Respons tidak berisi data candle.";
