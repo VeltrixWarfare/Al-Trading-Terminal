@@ -30,13 +30,39 @@ function Head({title,sub}:{title:string;sub:string}) {
   return <div className="page-heading"><span className="eyebrow">{sub}</span><h1>{title}</h1></div>;
 }
 
+function AnalysisView({data}:{data:any}) {
+  const bias = data?.bias || "WAIT";
+  const tone = bias === "BULLISH" ? "bullish" : bias === "BEARISH" ? "bearish" : "neutral";
+  return <div className="ai-report">
+    <div className="ai-verdict">
+      <div><span className="eyebrow">MARKET BIAS</span><strong className={`bias ${tone}`}>{bias.replace("_"," ")}</strong></div>
+      <div><span className="eyebrow">CONFIDENCE</span><strong className="confidence">{data?.confidence || "LOW"}</strong></div>
+    </div>
+    <div className="report-section"><span className="eyebrow">EXECUTIVE SUMMARY</span><p>{data?.summary || "Belum tersedia."}</p></div>
+    <div className="report-section"><span className="eyebrow">MARKET SNAPSHOT</span><p>{data?.market_snapshot || "Belum tersedia."}</p></div>
+    <div className="report-section"><span className="eyebrow">CANDLE OBSERVATIONS</span>
+      <ul>{(Array.isArray(data?.observations)?data.observations:[]).map((v:string,i:number)=><li key={i}>{v}</li>)}</ul>
+    </div>
+    <div className="scenario-grid">
+      <div className="scenario-card up"><span className="eyebrow">BULLISH SCENARIO</span><p>{data?.bullish_scenario || "Belum ada skenario."}</p></div>
+      <div className="scenario-card down"><span className="eyebrow">BEARISH SCENARIO</span><p>{data?.bearish_scenario || "Belum ada skenario."}</p></div>
+    </div>
+    <div className="report-section"><span className="eyebrow">KEY LEVELS</span>
+      <ul>{(Array.isArray(data?.key_levels)?data.key_levels:[]).map((v:string,i:number)=><li key={i}>{v}</li>)}</ul>
+    </div>
+    <div className="report-section"><span className="eyebrow">INVALIDATION</span><p>{data?.invalidation || "Belum tersedia."}</p></div>
+    <div className="report-conclusion"><span className="eyebrow">AI CONCLUSION</span><p>{data?.conclusion || "WAIT — belum ada kesimpulan."}</p></div>
+    <div className="report-limits"><span className="eyebrow">DATA LIMITATIONS</span><p>{data?.limitations || "Analisis hanya berdasarkan data OHLC yang diterima."}</p></div>
+  </div>;
+}
+
 export default function Dashboard() {
   const [page,setPage] = useState("Overview");
   const [payload,setPayload] = useState<MarketPayload|null>(null);
   const [status,setStatus] = useState("NOT CONNECTED");
   const [message,setMessage] = useState("Refresh data untuk mengambil harga XAU/USD.");
   const [loading,setLoading] = useState(false);
-  const [analysis,setAnalysis] = useState("");
+  const [analysis,setAnalysis] = useState<any>(null);
   const [aiError,setAiError] = useState("");
   const [timeframe,setTimeframe] = useState("M15");
   const [riskBalance,setRiskBalance] = useState("1000");
@@ -134,7 +160,7 @@ export default function Dashboard() {
         </Panel>
         <div className="content-grid overview-bottom">
           <Panel><div className="panel-head"><h2><BrainCircuit size={17}/> AI Market Analysis</h2><span className="tag">COPILOT</span></div>
-            <div className="analysis-box"><span className="eyebrow">LATEST OUTPUT</span><p>{analysis||aiError||"Belum ada analisis. Ambil data market dan jalankan AI Analysis."}</p></div>
+            <div className="analysis-box"><span className="eyebrow">LATEST OUTPUT</span>{analysis ? <AnalysisView data={analysis}/> : <p>{aiError||"Belum ada analisis. Ambil data market dan jalankan AI Analysis."}</p>}</div>
             <button className="button primary full" onClick={()=>setPage("AI Analysis")}>Open AI Analysis</button>
           </Panel>
           <Panel><div className="panel-head"><h2><Activity size={17}/> Workspace Summary</h2><span className="tag">LOCAL JOURNAL</span></div><div className="summary-grid"><div><b>{stats.total}</b><small>Journal records</small></div><div><b>{stats.winRate}%</b><small>Recorded win rate</small></div></div><button className="button full" onClick={()=>setPage("Journal")}>Open Journal</button></Panel>
@@ -144,7 +170,7 @@ export default function Dashboard() {
       {page==="AI Analysis" && <><Head title="AI Market Analysis" sub="REASONING MODULE · XAUUSD"/><Panel>
         <div className="panel-head"><div><h2>Research Copilot</h2><span className="muted">Analisis hanya menggunakan candle yang berhasil diambil.</span></div><span className="tag">NO AUTO EXECUTION</span></div>
         <div className="toolbar"><select className="select" value={timeframe} onChange={e=>changeFrame(e.target.value)}>{frames.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><button className="button" onClick={()=>refreshMarket()} disabled={loading}><RefreshCw size={14}/> Refresh market</button></div>
-        <div className="analysis-box tall"><span className="eyebrow">ANALYSIS OUTPUT</span><p>{analysis||aiError||"Belum ada hasil analisis."}</p></div>
+        <div className="analysis-box tall"><span className="eyebrow">ANALYSIS OUTPUT</span>{analysis ? <AnalysisView data={analysis}/> : <p>{aiError||"Belum ada hasil analisis."}</p>}</div>
         <button className="button primary full" onClick={runAnalysis} disabled={loading||!payload}><BrainCircuit size={15}/>{loading?"Processing...":"Run AI analysis"}</button>
         <p className="disclaimer">Informasi edukatif, bukan kepastian arah harga atau instruksi transaksi. AI dapat keliru.</p>
       </Panel></>}
